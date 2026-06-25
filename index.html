@@ -619,34 +619,17 @@ function update(dt) {
   var speedPct  = pr.speed / maxSpeed;
   var dx        = dt * 2 * speedPct;
 
-  // 玩家操控：重力感应优先 → 触控键 → 键盘
-  var steerInput = 0, accelInput = 0, brakeInput = 0;
-  if (gyroReady && isTouchDevice) {
-    // 重力感应：左右倾斜 gamma 控制转向，前后倾斜 beta 控制速度
-    var dead = 5;   // 死区（度）
-    if (gyroGamma > dead)      steerInput = limit((gyroGamma - dead) / 22, 0, 1);
-    else if (gyroGamma < -dead) steerInput = -limit((Math.abs(gyroGamma) - dead) / 22, 0, 1);
-    // beta: 手机竖直 ~90°，向前趴 = beta 变小 = 加速，向后仰 = beta 变大 = 刹车
-    var tilt = (gyroNeutral - gyroBeta) / 30;
-    if (tilt > 0.1)  accelInput = limit(tilt, 0, 1.2);
-    if (tilt < -0.1) brakeInput = limit(Math.abs(tilt), 0, 1.2);
-  } else {
-    // 键盘 / 触控方向键
-    if (keyLeft)       steerInput = -1;
-    else if (keyRight) steerInput = 1;
-    if (keyFaster)     accelInput = 1;
-    else if (keySlower) brakeInput = 1;
-  }
-
-  pr.offset += dx * steerInput;
+  // 玩家操控：方向键 / 触控按钮
+  if (keyLeft)        pr.offset -= dx;
+  else if (keyRight)  pr.offset += dx;
   pr.offset -= dx * speedPct * playerSeg.curve * centrifugal;
 
-  if (accelInput > 0)      pr.speed = accelerate(pr.speed, accel * accelInput, dt);
-  else if (brakeInput > 0) pr.speed = accelerate(pr.speed, breaking * brakeInput, dt);
-  else                     pr.speed = accelerate(pr.speed, decel, dt);
+  if (keyFaster)       pr.speed = accelerate(pr.speed, accel, dt);
+  else if (keySlower)  pr.speed = accelerate(pr.speed, breaking, dt);
+  else                 pr.speed = accelerate(pr.speed, decel, dt);
 
-  // 触控设备自动保持最低速度（新手/手机友好：只管转向，车自动走）
-  if (isTouchDevice && pr.speed < maxSpeed * 0.25 && brakeInput < 0.1) {
+  // 触控设备自动保持最低速度
+  if (isTouchDevice && pr.speed < maxSpeed * 0.25 && !keySlower) {
     pr.speed = accelerate(pr.speed, accel * 0.5, dt);
   }
 
@@ -665,7 +648,7 @@ function update(dt) {
   advanceZ(pr, dt * pr.speed);
 
   // 视觉转向插值
-  var targetSteer = steerInput;
+  var targetSteer = (keyLeft ? -1 : 0) + (keyRight ? 1 : 0);
   steerVisual += (targetSteer - steerVisual) * Math.min(1, dt * 8);
 
   checkFinishes();
@@ -973,7 +956,7 @@ function render() {
     var hw = 320, hh = 80, hx = (width - hw) / 2, hy = height * 0.55;
     roundRect(ctx, hx, hy, hw, hh, 12); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 24px "Segoe UI","Microsoft YaHei",sans-serif';
-    var hintText = gyroReady ? '📱 倾斜手机：左右转 / 前后加减速' : (isTouchDevice ? '◀ ▶ 转向    ▲ 加速    ▼ 刹车' : '← → 转向    ↑ 加速    ↓ 刹车');
+    var hintText = isTouchDevice ? '◀ ▶ 转向    ▲ 加速    ▼ 刹车' : '← → 转向    ↑ 加速    ↓ 刹车';
     ctx.fillText(hintText, width / 2, hy + 28);
   }
 }
@@ -983,10 +966,6 @@ function render() {
  * ============================================================ */
 function startCountdown() {
   initAudio();
-  // 锁定横屏
-  if (screen.orientation && screen.orientation.lock) {
-    screen.orientation.lock('landscape').catch(function(){});
-  }
   buildTrack(currentTrack);
   initRacers();
   rebuildSegCars();
@@ -1055,33 +1034,26 @@ document.addEventListener('touchstart', function(){
 canvas.addEventListener('click', function(e){
   if (e.target !== canvas) return;   // 忽略按钮等子元素的点击
   e.preventDefault();
-  triggerAction();
+	triggerAction();
 });
 
-// ===== 重力感应控制（手机倾斜转向 + 加减速）=====
-var gyroGamma = 0, gyroBeta = 0, gyroReady = false, gyroNeutral = 45;
-if (window.DeviceOrientationEvent) {
-  // iOS 13+ 需要请求权限
-  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-    document.addEventListener('touchstart', function requestGyro() {
-      DeviceOrientationEvent.requestPermission()
-        .then(function(state) { if (state === 'granted') enableGyro(); })
-        .catch(function(){});
-    }, {once: true});
+// ===== 横屏检测（JS 兜底，比 CSS media query 更可靠）=====
+function checkOrientation() {
+  var isPortrait = window.innerWidth < window.innerHeight;
+  var rh = document.getElementById('rotateHint');
+  if (isTouchDevice && isPortrait) {
+    rh.style.display = 'block';
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('touchPad').style.display = 'none';
   } else {
-    window.addEventListener('deviceorientation', handleOrientation);
-  }
-  // 非 iOS 直接启用
-  if (typeof DeviceOrientationEvent.requestPermission !== 'function') {
-    window.addEventListener('deviceorientation', handleOrientation);
+    rh.style.display = 'none';
+    document.getElementById('game').style.display = '';
+    if (isTouchDevice) document.getElementById('touchPad').style.display = '';
   }
 }
-function enableGyro() { window.addEventListener('deviceorientation', handleOrientation); }
-function handleOrientation(e) {
-  gyroGamma = e.gamma || 0;
-  gyroBeta  = e.beta  || 0;
-  if (!gyroReady) { gyroNeutral = gyroBeta; gyroReady = true; }
-}
+window.addEventListener('orientationchange', function(){ setTimeout(checkOrientation, 300); });
+window.addEventListener('resize', checkOrientation);
+checkOrientation();
 
 function setKey(code, down) { keys[code] = down; }
 
