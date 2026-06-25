@@ -12,6 +12,18 @@
     user-select: none; -webkit-user-select: none;
   }
   #game { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+  /* 横屏提示 */
+  #rotateHint {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: #0a0a12; z-index: 999; color: #fff; text-align: center;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  }
+  #rotateHint .icon { font-size: 72px; margin-top: 35vh; }
+  #rotateHint .txt  { font-size: 22px; margin-top: 16px; color: #ffd23f; }
+  @media screen and (orientation: portrait) {
+    #rotateHint { display: block; }
+    .touch-btn, #game { display: none !important; }
+  }
   /* 触控按钮 —— 手机/平板专用 */
   .touch-btn {
     position: fixed; z-index: 10; border: none; outline: none;
@@ -36,6 +48,13 @@
   <button id="btnUp"    class="touch-btn touch-up"    style="right:92px; bottom:210px; width:68px; height:68px;">▲</button>
   <button id="btnDown"  class="touch-btn touch-down"  style="right:12px; bottom:120px; width:68px; height:68px;">▼</button>
   <button id="btnAct"   class="touch-btn touch-act"   style="left:50%; bottom:30px; width:160px; height:50px; transform:translateX(-50%); border-radius:30px;">开始</button>
+</div>
+
+<!-- 竖屏提示 -->
+<div id="rotateHint">
+  <div class="icon">📱</div>
+  <div class="txt">请旋转手机</div>
+  <div style="color:#9fe;font-size:16px;margin-top:8px;">横屏体验极速赛车</div>
 </div>
 
 <script>
@@ -964,6 +983,10 @@ function render() {
  * ============================================================ */
 function startCountdown() {
   initAudio();
+  // 锁定横屏
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape').catch(function(){});
+  }
   buildTrack(currentTrack);
   initRacers();
   rebuildSegCars();
