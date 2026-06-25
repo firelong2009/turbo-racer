@@ -446,7 +446,7 @@ var ranking = [];         // 按名次排序的 racer 数组（每帧更新）
 var bgOffset = 0;
 var crashFlash = 0;
 var steerVisual = 0;
-var countdownT = 0;
+var countdownDeadline = 0;
 var nextFinishRank = 1;   // 下一个完赛车的名次
 var raceTimer = 0;
 var wins = parseInt(localStorage.getItem('turboRacerWins') || '0', 10);
@@ -608,11 +608,10 @@ function rebuildSegCars() {
  *  更新（按状态分发）
  * ============================================================ */
 function update(dt) {
-	if (state === STATE.COUNTDOWN) {
-	    countdownT -= dt;
-	    if (countdownT <= 0) { state = STATE.RACE; playBeep(660); }
-	    return;
-	  }
+		if (state === STATE.COUNTDOWN) {
+		    if (performance.now() >= countdownDeadline) { state = STATE.RACE; playBeep(660); }
+		    return;
+		  }
   if (state !== STATE.RACE) return;
 
   raceTimer += dt;
@@ -887,16 +886,17 @@ function renderTrackSelect() {
 }
 
 function renderCountdown() {
-  var num = Math.ceil(countdownT);
+  var remain = Math.max(0, countdownDeadline - performance.now()) / 1000; // 剩余秒数
+  var num = Math.ceil(remain);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, width, height);
-  if (num > 0) {
-    var scale = 1 - (countdownT - Math.floor(countdownT));
+  if (num > 0 && remain > 0.05) {
+    var frac = remain - Math.floor(remain); // 小数部分用于动画
     ctx.save();
     ctx.translate(width / 2, height / 2);
-    ctx.scale(1 + scale * 0.5, 1 + scale * 0.5);
+    ctx.scale(1 + frac * 0.5, 1 + frac * 0.5);
     ctx.fillStyle = '#fff'; ctx.font = 'bold 160px "Segoe UI",sans-serif';
-    ctx.globalAlpha = 1 - scale * 0.6;
+    ctx.globalAlpha = Math.min(1, remain);
     ctx.fillText(num, 0, 0);
     ctx.globalAlpha = 1; ctx.restore();
   } else {
@@ -976,7 +976,7 @@ function startCountdown() {
   initRacers();
   rebuildSegCars();
   calcRankings();
-  countdownT = 3.0;
+  countdownDeadline = performance.now() + 3500;  // 3.5s = 3-2-1-GO 足够
   state = STATE.COUNTDOWN;
   bgOffset = 0;
 }
