@@ -1086,14 +1086,21 @@ bindBtn(btnRight, 'ArrowRight');
 bindBtn(btnUp,    'ArrowUp');
 bindBtn(btnDown,  'ArrowDown');
 
-// 动作按钮：菜单 / 选择 / 重开 / 下一场
-btnAct.addEventListener('touchstart', function(e){ e.preventDefault(); triggerAction(); }, {passive:false});
-btnAct.addEventListener('mousedown',  function(e){ e.preventDefault(); triggerAction(); });
+// 动作按钮：三重保险，带防抖
+var lastAction = 0;
+btnAct.addEventListener('touchstart', function(e){ e.preventDefault(); tryAction(); }, {passive:false});
+btnAct.addEventListener('mousedown',  function(e){ e.preventDefault(); tryAction(); });
+btnAct.addEventListener('click',      function(e){ e.preventDefault(); tryAction(); });
+function tryAction() {
+  var now = Date.now();
+  if (now - lastAction < 500) return;   // 防抖 500ms
+  lastAction = now;
+  triggerAction();
+}
 
 function triggerAction() {
-  goFullscreen();
   if (state === STATE.MENU)        state = STATE.TRACK_SELECT;
-  else if (state === STATE.TRACK_SELECT) startCountdown();
+  else if (state === STATE.TRACK_SELECT) { startCountdown(); goFullscreen(); }
   else if (state === STATE.RESULT) state = STATE.TRACK_SELECT;
 }
 
