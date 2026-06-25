@@ -446,7 +446,7 @@ var ranking = [];         // 按名次排序的 racer 数组（每帧更新）
 var bgOffset = 0;
 var crashFlash = 0;
 var steerVisual = 0;
-var countdownDeadline = 0;
+var countdownDeadline = 0, countdownTimer = null;
 var nextFinishRank = 1;   // 下一个完赛车的名次
 var raceTimer = 0;
 var wins = parseInt(localStorage.getItem('turboRacerWins') || '0', 10);
@@ -609,8 +609,7 @@ function rebuildSegCars() {
  * ============================================================ */
 function update(dt) {
 		if (state === STATE.COUNTDOWN) {
-		    if (performance.now() >= countdownDeadline) { state = STATE.RACE; playBeep(660); }
-		    return;
+		    return;  // setTimeout 负责切换，update 不管
 		  }
   if (state !== STATE.RACE) return;
 
@@ -976,7 +975,11 @@ function startCountdown() {
   initRacers();
   rebuildSegCars();
   calcRankings();
-  countdownDeadline = performance.now() + 3500;  // 3.5s = 3-2-1-GO 足够
+  clearTimeout(countdownTimer);  // 清除旧定时器
+  countdownDeadline = performance.now() + 3500;
+  countdownTimer = setTimeout(function(){
+    if (state === STATE.COUNTDOWN) { state = STATE.RACE; playBeep(660); }
+  }, 3500);
   state = STATE.COUNTDOWN;
   bgOffset = 0;
 }
@@ -1100,7 +1103,7 @@ function tryAction() {
 
 function triggerAction() {
   if (state === STATE.MENU)        { state = STATE.TRACK_SELECT; }
-  else if (state === STATE.TRACK_SELECT) { startCountdown(); goFullscreen(); }
+  else if (state === STATE.TRACK_SELECT) { try{goFullscreen();}catch(e){} startCountdown(); }
   else if (state === STATE.RESULT) state = STATE.TRACK_SELECT;
 }
 
